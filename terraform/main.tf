@@ -144,93 +144,15 @@ resource "aws_ecs_service" "app" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = module.vpc.private_subnets
+    subnets          = module.vpc.public_subnets
     security_groups  = [aws_security_group.app.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.app.arn
-    container_name   = "${var.app_name}-container"
-    container_port   = 8080
-  }
-
-  depends_on = [aws_lb_listener.app]
-
-  tags = var.common_tags
-}
-
-# Application Load Balancer
-resource "aws_lb" "app" {
-  name               = "${var.app_name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = module.vpc.public_subnets
-
-  tags = var.common_tags
-}
-
-resource "aws_security_group" "alb" {
-  name_prefix = "${var.app_name}-alb-"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    assign_public_ip = true
   }
 
   tags = var.common_tags
 }
 
-resource "aws_lb_target_group" "app" {
-  name        = "${var.app_name}-tg"
-  port        = 8080
-  protocol    = "HTTP"
-  vpc_id      = module.vpc.vpc_id
-  target_type = "ip"
 
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    interval            = 30
-    matcher             = "200"
-    path                = "/healthz"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 5
-    unhealthy_threshold = 2
-  }
-
-  tags = var.common_tags
-}
-
-resource "aws_lb_listener" "app" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
-  }
-}
 
 # ECR Repository
 resource "aws_ecr_repository" "app" {
@@ -301,9 +223,9 @@ resource "random_password" "mcp_token" {
 }
 
 # Outputs
-output "alb_dns_name" {
-  description = "The DNS name of the load balancer"
-  value       = aws_lb.app.dns_name
+output "ecs_service_public_ip" {
+  description = "The public IP of the ECS service"
+  value       = "Use ECS service public IP directly"
 }
 
 

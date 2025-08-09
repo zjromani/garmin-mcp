@@ -4,10 +4,9 @@ This Terraform configuration deploys the Garmin MCP application to AWS using ECS
 
 ## Architecture
 
-- **ECS Fargate**: Serverless container hosting
+- **ECS Fargate**: Serverless container hosting with public IP
 - **In-Memory Cache**: Fast data storage (no persistence)
-- **Application Load Balancer**: Public access
-- **VPC**: Isolated network with public/private subnets
+- **VPC**: Isolated network with public subnets
 - **ECR**: Container registry
 - **CloudWatch**: Logging and monitoring
 
@@ -29,8 +28,7 @@ cd terraform
 
 This will:
 - Create VPC, subnets, and security groups
-- Create ECS cluster and service
-- Set up Application Load Balancer
+- Create ECS cluster and service with public IP
 - Create ECR repository
 - Generate MCP API token
 
@@ -48,14 +46,13 @@ This will:
 ## Estimated Costs
 
 - **ECS Fargate**: ~$3-5/month (256 CPU, 512MB RAM)
-- **ALB**: ~$20/month
 - **Data transfer**: ~$1-2/month
-- **Total**: ~$25-30/month
+- **Total**: ~$5-7/month
 
 ## Outputs
 
 After deployment, you'll get:
-- **Application URL**: Public load balancer URL
+- **Application URL**: ECS service public IP
 - **MCP API Token**: For ChatGPT Remote MCP integration
 
 ## Cleanup
