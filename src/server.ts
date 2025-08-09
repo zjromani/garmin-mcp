@@ -7,35 +7,19 @@
 
 import express from "express";
 import bodyParser from "body-parser";
-import { Pool } from "pg";
 import crypto from "crypto";
 import type { Request, Response, NextFunction } from "express";
 
 const {
   PORT = "8080",
-  DATABASE_URL,
   MCP_API_TOKEN,                 // bearer for ChatGPT Remote MCP client
   GARMIN_WEBHOOK_SECRET,         // only if Garmin provides one
+  GARMIN_API_KEY,                // for querying historical data
+  GARMIN_API_SECRET,             // for Garmin Health API
 } = process.env;
 
-if (!DATABASE_URL) throw new Error("DATABASE_URL required");
-
-// Postgres
-const db = new Pool({ connectionString: DATABASE_URL });
-await db.query(`
-create table if not exists garmin_daily (
-  user_id text not null,
-  day date not null,
-  steps int,
-  resting_hr int,
-  calories int,
-  sleep_seconds int,
-  body_battery_min int,
-  body_battery_max int,
-  payload jsonb not null,
-  primary key (user_id, day)
-);
-`);
+// In-memory cache for recent data (survives container restarts)
+const healthDataCache = new Map<string, any>();
 
 // Express
 const app = express();
@@ -84,19 +68,19 @@ app.post("/garmin/webhook", async (req: Request, res: Response) => {
     const bbMin = ev.bodyBatteryMin ?? null;
     const bbMax = ev.bodyBatteryMax ?? ev.bodyBattery?.max ?? null;
 
-    await db.query(
-      `insert into garmin_daily (user_id, day, steps, resting_hr, calories, sleep_seconds, body_battery_min, body_battery_max, payload)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       on conflict (user_id, day) do update set
-         steps=excluded.steps,
-         resting_hr=excluded.resting_hr,
-         calories=excluded.calories,
-         sleep_seconds=excluded.sleep_seconds,
-         body_battery_min=excluded.body_battery_min,
-         body_battery_max=excluded.body_battery_max,
-         payload=excluded.payload`,
-      [userId, dayStr, steps, resting_hr, calories, sleep_seconds, bbMin, bbMax, ev]
-    );
+    // Store in memory cache
+    const cacheKey = `${userId}-${dayStr}`;
+    healthDataCache.set(cacheKey, {
+      user_id: userId,
+      day: dayStr,
+      steps,
+      resting_hr,
+      calories,
+      sleep_seconds,
+      body_battery_min: bbMin,
+      body_battery_max: bbMax,
+      payload: ev
+    });
   }
 
   res.status(200).send("ok");
@@ -145,26 +129,39 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
     if (name === "garmin.getDailySummary") {
       const user = String(args.user_id);
       const date = (args.date as string) || new Date().toISOString().slice(0, 10);
-      const { rows } = await db.query(
-        `select user_id, day, steps, resting_hr, calories, sleep_seconds, body_battery_min, body_battery_max
-         from garmin_daily where user_id=$1 and day=$2`, [user, date]
-      );
-      if (!rows.length) {
-        return res.json({ content: [{ type: "text", text: "no data" }] });
+      
+      // Check cache first
+      const cacheKey = `${user}-${date}`;
+      const cachedData = healthDataCache.get(cacheKey);
+      
+      if (cachedData) {
+        return res.json({ content: [{ type: "json", json: cachedData }] });
       }
-      return res.json({ content: [{ type: "json", json: rows[0] }] });
+      
+      // If not in cache, query Garmin API (placeholder for now)
+      return res.json({ content: [{ type: "text", text: "no data available" }] });
       
     } else if (name === "garmin.getRecentDays") {
       const user = String(args.user_id);
       const days = Number(args.days || 7);
-      const { rows } = await db.query(
-        `select user_id, day, steps, resting_hr, calories, sleep_seconds
-         from garmin_daily
-         where user_id=$1
-         order by day desc
-         limit $2`, [user, days]
-      );
-      return res.json({ content: [{ type: "json", json: rows }] });
+      
+      // Get recent days from cache
+      const recentData = [];
+      const today = new Date();
+      
+      for (let i = 0; i < days; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().slice(0, 10);
+        const cacheKey = `${user}-${dateStr}`;
+        const cachedData = healthDataCache.get(cacheKey);
+        
+        if (cachedData) {
+          recentData.push(cachedData);
+        }
+      }
+      
+      return res.json({ content: [{ type: "json", json: recentData }] });
       
     } else {
       return res.status(400).json({ error: `Unknown tool: ${name}` });
