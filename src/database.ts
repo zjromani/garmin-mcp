@@ -59,9 +59,18 @@ export class Database {
     return new Promise((resolve, reject) => {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO health_data 
+        INSERT INTO health_data 
         (user_id, day, steps, resting_hr, calories, sleep_seconds, body_battery_min, body_battery_max, payload, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, day) DO UPDATE SET
+          steps = excluded.steps,
+          resting_hr = excluded.resting_hr,
+          calories = excluded.calories,
+          sleep_seconds = excluded.sleep_seconds,
+          body_battery_min = excluded.body_battery_min,
+          body_battery_max = excluded.body_battery_max,
+          payload = excluded.payload,
+          updated_at = excluded.updated_at
       `);
 
       stmt.run(
