@@ -57,6 +57,19 @@ npm start
 docker-compose up --build
 ```
 
+### Local HTTPS (Cloudflare Quick Tunnel)
+
+You can expose your local server with a temporary public HTTPS URL (no DNS or account needed):
+
+```bash
+brew install cloudflared
+./scripts/cloudflared-quick.sh
+```
+
+This prints a `https://<random>.trycloudflare.com` URL. Use it for testing endpoints:
+- Webhook: `https://<random>.trycloudflare.com/garmin/webhook`
+- Health: `https://<random>.trycloudflare.com/healthz`
+
 ## Environment Variables
 
 | Variable | Description | Required |
