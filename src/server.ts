@@ -15,9 +15,10 @@ const {
   GARMIN_API_SECRET,
 } = process.env;
 
-const db = new Database();
-const app = express();
-app.use(bodyParser.json({ limit: "2mb" }));
+export function createServer(database?: Database, options = { skipAuth: false }) {
+  const db = database || new Database();
+  const app = express();
+  app.use(bodyParser.json({ limit: "2mb" }));
 
 // Rate limiting for webhook endpoint
 const webhookLimiter = rateLimit({
@@ -31,9 +32,11 @@ app.use('/garmin/webhook', webhookLimiter);
 app.get("/healthz", (_req: Request, res: Response) => res.status(200).send("ok"));
 
 app.use("/mcp", (req: Request, res: Response, next: NextFunction) => {
-  const auth = req.headers.authorization || "";
-  if (!MCP_API_TOKEN || auth !== `Bearer ${MCP_API_TOKEN}`) {
-    return res.status(401).send("unauthorized");
+  if (!options.skipAuth) {
+    const auth = req.headers.authorization || "";
+    if (!MCP_API_TOKEN || auth !== `Bearer ${MCP_API_TOKEN}`) {
+      return res.status(401).send("unauthorized");
+    }
   }
   next();
 });
@@ -163,6 +166,13 @@ app.get("/mcp/sse", (req: Request, res: Response) => {
   });
 });
 
-app.listen(Number(PORT), () => {
-  console.log(`HTTP up on :${PORT}`);
-});
+  return app;
+}
+
+// Only start server if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const app = createServer();
+  app.listen(Number(PORT), () => {
+    console.log(`HTTP up on :${PORT}`);
+  });
+}
