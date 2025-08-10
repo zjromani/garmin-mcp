@@ -19,3 +19,9 @@ variable "common_tags" {
     ManagedBy   = "terraform"
   }
 }
+
+variable "cloudflare_tunnel_token" {
+  description = "Cloudflare Tunnel token for secure outbound-only access"
+  type        = string
+  sensitive   = true
+}

@@ -113,6 +113,28 @@ resource "aws_ecs_task_definition" "app" {
         retries     = 3
         startPeriod = 60
       }
+    },
+    {
+      name  = "cloudflared"
+      image = "cloudflare/cloudflared:latest"
+      command = [
+        "tunnel",
+        "--no-autoupdate",
+        "run",
+        "--token",
+        var.cloudflare_tunnel_token
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.app.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "cloudflared"
+        }
+      }
+
+      essential = false
     }
   ])
 
