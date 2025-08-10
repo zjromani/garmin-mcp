@@ -24,8 +24,7 @@ module "vpc" {
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  enable_nat_gateway = false
   enable_vpn_gateway = false
 
   tags = var.common_tags
@@ -36,12 +35,8 @@ resource "aws_security_group" "app" {
   name_prefix = "${var.app_name}-app-"
   vpc_id      = module.vpc.vpc_id
 
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # No inbound rules - all traffic blocked for security
+  # Cloudflare Tunnel will provide outbound-only access
 
   egress {
     from_port   = 0
@@ -88,17 +83,6 @@ resource "aws_ecs_task_definition" "app" {
         {
           containerPort = 8080
           protocol      = "tcp"
-        }
-      ]
-
-      environment = [
-        {
-          name  = "PORT"
-          value = "8080"
-        },
-        {
-          name  = "MCP_API_TOKEN"
-          value = random_password.mcp_token.result
         }
       ]
 
