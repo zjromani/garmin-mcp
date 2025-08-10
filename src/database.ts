@@ -27,7 +27,6 @@ export class Database {
   private async init(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.serialize(() => {
-        // Create health_data table
         this.db.run(`
           CREATE TABLE IF NOT EXISTS health_data (
             user_id TEXT NOT NULL,

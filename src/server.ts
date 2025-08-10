@@ -1,9 +1,4 @@
-// Purpose: single process hosting a Garmin webhook and an MCP server
-// Docs in comments:
-// MCP quickstart https://modelcontextprotocol.io/quickstart/server
-// OpenAI Remote MCP https://platform.openai.com/docs/guides/tools-remote-mcp
-// MCP SDK https://www.npmjs.com/package/@modelcontextprotocol/sdk
-// Garmin Health overview https://developer.garmin.com/gc-developer-program/health-api/
+// Garmin webhook receiver + MCP server for ChatGPT integration
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -14,16 +9,13 @@ import { Database } from "./database.js";
 
 const {
   PORT = "8080",
-  MCP_API_TOKEN,                 // bearer for ChatGPT Remote MCP client
-  GARMIN_WEBHOOK_SECRET,         // only if Garmin provides one
-  GARMIN_API_KEY,                // for querying historical data
-  GARMIN_API_SECRET,             // for Garmin Health API
+  MCP_API_TOKEN,
+  GARMIN_WEBHOOK_SECRET,
+  GARMIN_API_KEY,
+  GARMIN_API_SECRET,
 } = process.env;
 
-// Initialize SQLite database for persistent storage
 const db = new Database();
-
-// Express
 const app = express();
 app.use(bodyParser.json({ limit: "2mb" }));
 
@@ -36,10 +28,8 @@ const webhookLimiter = rateLimit({
 
 app.use('/garmin/webhook', webhookLimiter);
 
-// Healthcheck for load balancers
 app.get("/healthz", (_req: Request, res: Response) => res.status(200).send("ok"));
 
-// Simple auth wall for MCP route so the world cannot enumerate tools
 app.use("/mcp", (req: Request, res: Response, next: NextFunction) => {
   const auth = req.headers.authorization || "";
   if (!MCP_API_TOKEN || auth !== `Bearer ${MCP_API_TOKEN}`) {
@@ -48,7 +38,6 @@ app.use("/mcp", (req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Optional signature verification; confirm the exact header and algorithm in your Garmin onboarding packet
 function verifyGarmin(req: Request): boolean {
   if (!GARMIN_WEBHOOK_SECRET) return true;
   const sig = req.header("X-Garmin-Signature") || "";
@@ -59,15 +48,12 @@ function verifyGarmin(req: Request): boolean {
   return Boolean(sig && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)));
 }
 
-// Webhook receiver. Garmin pushes JSON events. Shapes vary by feed.
-// Health API overview https://developer.garmin.com/gc-developer-program/health-api/
 app.post("/garmin/webhook", async (req: Request, res: Response) => {
   if (!verifyGarmin(req)) return res.status(401).send("bad signature");
 
   const events = Array.isArray(req.body) ? req.body : [req.body];
 
   for (const ev of events) {
-    // Map common fields. Adjust to your actual payload
     const userId = ev.userId || ev.user_id || "unknown";
     const dayStr: string =
       (ev.calendarDate || ev.date || new Date().toISOString()).slice(0, 10);
@@ -79,7 +65,6 @@ app.post("/garmin/webhook", async (req: Request, res: Response) => {
     const bbMin = ev.bodyBatteryMin ?? null;
     const bbMax = ev.bodyBatteryMax ?? ev.bodyBattery?.max ?? null;
 
-    // Store in database
     await db.upsertHealthData({
       user_id: userId,
       day: dayStr,
@@ -96,10 +81,8 @@ app.post("/garmin/webhook", async (req: Request, res: Response) => {
   res.status(200).send("ok");
 });
 
-// Simple MCP-compatible API endpoints for ChatGPT Remote MCP
-// OpenAI Remote MCP https://platform.openai.com/docs/guides/tools-remote-mcp
 
-// List available tools
+
 app.get("/mcp/tools", async (_req: Request, res: Response) => {
   const tools = [
     {
@@ -131,7 +114,6 @@ app.get("/mcp/tools", async (_req: Request, res: Response) => {
   res.json({ tools });
 });
 
-// Execute a tool
 app.post("/mcp/tools/call", async (req: Request, res: Response) => {
   const { name, arguments: args } = req.body;
   
@@ -140,7 +122,6 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
       const user = String(args.user_id);
       const date = (args.date as string) || new Date().toISOString().slice(0, 10);
       
-      // Check database first
       const dbData = await db.getHealthData(user, date);
       
       if (dbData) {
@@ -153,7 +134,6 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
       const user = String(args.user_id);
       const days = Number(args.days || 7);
       
-      // Get recent days from database
       const recentData = await db.getRecentHealthData(user, days);
       
       return res.json({ content: [{ type: "json", json: recentData }] });
@@ -167,16 +147,13 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
   }
 });
 
-// MCP SSE endpoint for compatibility
 app.get("/mcp/sse", (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   
-  // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: "connection", status: "connected" })}\n\n`);
   
-  // Keep connection alive
   const interval = setInterval(() => {
     res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
   }, 30000);

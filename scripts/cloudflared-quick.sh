@@ -13,11 +13,9 @@ fi
 : > "$LOGFILE"
 echo "Starting Cloudflare Quick Tunnel to ${SERVICE_URL}... (logs: $LOGFILE)"
 
-# Start cloudflared in background and log to file
 cloudflared tunnel --no-autoupdate --url "${SERVICE_URL}" --logfile "$LOGFILE" &
 CLOUDFLARED_PID=$!
 
-# Wait for the URL to appear
 URL=""
 for i in {1..30}; do
   if grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOGFILE" >/dev/null 2>&1; then
@@ -35,7 +33,6 @@ else
   echo "Failed to detect tunnel URL. See logs: $LOGFILE" >&2
 fi
 
-# Stream live logs and wait for process
 trap 'kill $CLOUDFLARED_PID >/dev/null 2>&1 || true' INT TERM
 tail -f "$LOGFILE" &
 TAIL_PID=$!

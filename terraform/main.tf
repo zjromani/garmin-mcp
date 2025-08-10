@@ -12,7 +12,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# VPC and Networking
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
   version = "5.0.0"
@@ -30,7 +29,6 @@ module "vpc" {
   tags = var.common_tags
 }
 
-# Security Groups
 resource "aws_security_group" "app" {
   name_prefix = "${var.app_name}-app-"
   vpc_id      = module.vpc.vpc_id
@@ -52,7 +50,6 @@ resource "aws_security_group" "app" {
 
 
 
-# ECS Cluster
 resource "aws_ecs_cluster" "main" {
   name = "${var.app_name}-cluster"
 
@@ -64,7 +61,6 @@ resource "aws_ecs_cluster" "main" {
   tags = var.common_tags
 }
 
-# ECS Task Definition
 resource "aws_ecs_task_definition" "app" {
   family                   = "${var.app_name}-task"
   network_mode             = "awsvpc"
@@ -141,7 +137,6 @@ resource "aws_ecs_task_definition" "app" {
   tags = var.common_tags
 }
 
-# ECS Service
 resource "aws_ecs_service" "app" {
   name            = "${var.app_name}-service"
   cluster         = aws_ecs_cluster.main.id
@@ -160,7 +155,6 @@ resource "aws_ecs_service" "app" {
 
 
 
-# ECR Repository
 resource "aws_ecr_repository" "app" {
   name                 = var.app_name
   image_tag_mutability = "MUTABLE"
@@ -172,7 +166,6 @@ resource "aws_ecr_repository" "app" {
   tags = var.common_tags
 }
 
-# CloudWatch Logs
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/${var.app_name}"
   retention_in_days = 7
@@ -180,7 +173,6 @@ resource "aws_cloudwatch_log_group" "app" {
   tags = var.common_tags
 }
 
-# IAM Roles
 resource "aws_iam_role" "ecs_execution_role" {
   name = "${var.app_name}-ecs-execution-role"
 
@@ -222,13 +214,11 @@ resource "aws_iam_role" "ecs_task_role" {
 
 
 
-# Random MCP API token
 resource "random_password" "mcp_token" {
   length  = 32
   special = false
 }
 
-# Outputs
 output "ecs_service_public_ip" {
   description = "The public IP of the ECS service"
   value       = "Use ECS service public IP directly"
