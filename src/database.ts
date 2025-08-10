@@ -114,13 +114,9 @@ export class Database {
 
   async getRecentHealthData(userId: string, days: number): Promise<HealthData[]> {
     return new Promise((resolve, reject) => {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      
       this.db.all(
-        'SELECT * FROM health_data WHERE user_id = ? AND day >= ? ORDER BY day DESC LIMIT ?',
-        [userId, startDate.toISOString().slice(0, 10), days],
+        'SELECT * FROM health_data WHERE user_id = ? ORDER BY day DESC LIMIT ?',
+        [userId, days],
         (err: any, rows: any[]) => {
           if (err) {
             console.error('Error getting recent health data:', err);
