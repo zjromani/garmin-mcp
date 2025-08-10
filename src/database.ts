@@ -77,7 +77,7 @@ export class Database {
         JSON.stringify(data.payload),
         now,
         now,
-        (err) => {
+        (err: any) => {
           if (err) {
             console.error('Error upserting health data:', err);
             reject(err);
@@ -95,7 +95,7 @@ export class Database {
       this.db.get(
         'SELECT * FROM health_data WHERE user_id = ? AND day = ?',
         [userId, date],
-        (err, row) => {
+        (err: any, row: any) => {
           if (err) {
             console.error('Error getting health data:', err);
             reject(err);
@@ -103,7 +103,7 @@ export class Database {
             resolve({
               ...row,
               payload: JSON.parse(row.payload)
-            });
+            } as HealthData);
           } else {
             resolve(null);
           }
@@ -121,7 +121,7 @@ export class Database {
       this.db.all(
         'SELECT * FROM health_data WHERE user_id = ? AND day >= ? ORDER BY day DESC LIMIT ?',
         [userId, startDate.toISOString().slice(0, 10), days],
-        (err, rows) => {
+        (err: any, rows: any[]) => {
           if (err) {
             console.error('Error getting recent health data:', err);
             reject(err);
@@ -129,7 +129,7 @@ export class Database {
             resolve(rows.map(row => ({
               ...row,
               payload: JSON.parse(row.payload)
-            })));
+            } as HealthData)));
           }
         }
       );
