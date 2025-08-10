@@ -111,15 +111,63 @@ Get health data for the last N days.
 
 ## Deployment
 
-### AWS with Terraform
+### AWS with Terraform (Cost Optimized - ~$9/month)
 
-1. Configure AWS credentials
-2. Update `terraform/variables.tf` with your settings
-3. Deploy:
-```bash
-cd terraform
-./deploy.sh
-```
+Our infrastructure uses a cost-optimized architecture with Cloudflare Tunnel for secure access:
+
+- **ECS Fargate**: Single task with 0.25 vCPU, 0.5GB RAM
+- **No NAT Gateway**: Saves ~$33/month by using public IP for outbound only
+- **Cloudflare Tunnel**: Provides secure HTTPS access without public inbound traffic
+- **EFS Storage**: SQLite database persistence (~$0.30/month)
+
+#### Prerequisites
+
+1. **Cloudflare Account**: Create a tunnel and get the tunnel token
+2. **AWS Credentials**: Configure AWS CLI access
+3. **Domain**: Optional - for custom hostname instead of trycloudflare.com
+
+#### Deploy Steps
+
+1. **Create Cloudflare Tunnel**:
+   ```bash
+   # Install cloudflared
+   brew install cloudflared
+   
+   # Login to Cloudflare
+   cloudflared tunnel login
+   
+   # Create tunnel
+   cloudflared tunnel create garmin-mcp
+   
+   # Get tunnel token (save this)
+   cloudflared tunnel token garmin-mcp
+   ```
+
+2. **Configure Terraform**:
+   ```bash
+   cd terraform
+   
+   # Create terraform.tfvars with your tunnel token
+   echo 'cloudflare_tunnel_token = "your-tunnel-token-here"' > terraform.tfvars
+   ```
+
+3. **Deploy**:
+   ```bash
+   ./deploy.sh
+   ```
+
+4. **Configure Tunnel Route** (optional):
+   ```bash
+   # For custom domain
+   cloudflared tunnel route dns garmin-mcp webhook.yourdomain.com
+   ```
+
+#### Security Benefits
+
+- **No Public Inbound**: Security group blocks all incoming traffic
+- **Outbound Only**: Task can make outbound connections (Docker images, Cloudflare)
+- **Encrypted Tunnel**: All traffic encrypted through Cloudflare's edge
+- **Cost Effective**: No NAT Gateway or ALB required
 
 ### Manual Deployment
 
