@@ -122,6 +122,9 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
   
   try {
     if (name === "garmin.getDailySummary") {
+      if (!args.user_id) {
+        return res.status(400).json({ error: "Missing required argument: user_id" });
+      }
       const user = String(args.user_id);
       const date = (args.date as string) || new Date().toISOString().slice(0, 10);
       
@@ -134,6 +137,9 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
       return res.json({ content: [{ type: "text", text: "no data available" }] });
       
     } else if (name === "garmin.getRecentDays") {
+      if (!args.user_id) {
+        return res.status(400).json({ error: "Missing required argument: user_id" });
+      }
       const user = String(args.user_id);
       const days = Number(args.days || 7);
       
