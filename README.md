@@ -109,7 +109,46 @@ Get health data for the last N days.
 - `user_id` (string, required): User identifier
 - `days` (number, optional): Number of days to retrieve (default: 7)
 
-## Deployment
+## Versioning & Deployment
+
+### Versioning Strategy
+
+We use git-based versioning for Docker images:
+
+- **Git Tags**: Create semantic version tags (e.g., `v1.0.0`, `v1.1.0`)
+- **Docker Tags**: Images are tagged with both the git version and `latest`
+- **Rollback**: Can easily rollback by updating ECS task definition to use a previous version
+
+#### Creating a Release
+
+```bash
+# 1. Create a git tag for the release
+git tag v1.0.0
+
+# 2. Build and push with versioning
+cd terraform
+./build-and-push.sh
+
+# 3. Deploy to ECS
+aws ecs update-service --cluster garmin-mcp-cluster --service garmin-mcp-service --force-new-deployment
+```
+
+#### Version History
+
+- **v0.1.0**: Initial release with SQLite persistence and integration tests
+- **Next**: `v1.0.0` - Production ready with Cloudflare Tunnel deployment
+
+#### Rollback Process
+
+```bash
+# List available versions in ECR
+aws ecr describe-images --repository-name garmin-mcp --query 'imageDetails[*].imageTags' --output table
+
+# Update task definition to use specific version
+aws ecs update-service --cluster garmin-mcp-cluster --service garmin-mcp-service --task-definition garmin-mcp-task:REVISION_NUMBER
+```
+
+### Deployment
 
 ### AWS with Terraform (Cost Optimized - ~$9/month)
 
