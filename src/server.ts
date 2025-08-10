@@ -10,6 +10,7 @@ import bodyParser from "body-parser";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import type { Request, Response, NextFunction } from "express";
+import { Database } from "./database.js";
 
 const {
   PORT = "8080",
@@ -19,8 +20,8 @@ const {
   GARMIN_API_SECRET,             // for Garmin Health API
 } = process.env;
 
-// In-memory cache for recent data (survives container restarts)
-const healthDataCache = new Map<string, any>();
+// Initialize SQLite database for persistent storage
+const db = new Database();
 
 // Express
 const app = express();
@@ -78,9 +79,8 @@ app.post("/garmin/webhook", async (req: Request, res: Response) => {
     const bbMin = ev.bodyBatteryMin ?? null;
     const bbMax = ev.bodyBatteryMax ?? ev.bodyBattery?.max ?? null;
 
-    // Store in memory cache
-    const cacheKey = `${userId}-${dayStr}`;
-    healthDataCache.set(cacheKey, {
+    // Store in database
+    await db.upsertHealthData({
       user_id: userId,
       day: dayStr,
       steps,
@@ -140,36 +140,21 @@ app.post("/mcp/tools/call", async (req: Request, res: Response) => {
       const user = String(args.user_id);
       const date = (args.date as string) || new Date().toISOString().slice(0, 10);
       
-      // Check cache first
-      const cacheKey = `${user}-${date}`;
-      const cachedData = healthDataCache.get(cacheKey);
+      // Check database first
+      const dbData = await db.getHealthData(user, date);
       
-      if (cachedData) {
-        return res.json({ content: [{ type: "json", json: cachedData }] });
+      if (dbData) {
+        return res.json({ content: [{ type: "json", json: dbData }] });
       }
       
-      // If not in cache, query Garmin API (placeholder for now)
       return res.json({ content: [{ type: "text", text: "no data available" }] });
       
     } else if (name === "garmin.getRecentDays") {
       const user = String(args.user_id);
       const days = Number(args.days || 7);
       
-      // Get recent days from cache
-      const recentData = [];
-      const today = new Date();
-      
-      for (let i = 0; i < days; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().slice(0, 10);
-        const cacheKey = `${user}-${dateStr}`;
-        const cachedData = healthDataCache.get(cacheKey);
-        
-        if (cachedData) {
-          recentData.push(cachedData);
-        }
-      }
+      // Get recent days from database
+      const recentData = await db.getRecentHealthData(user, days);
       
       return res.json({ content: [{ type: "json", json: recentData }] });
       
