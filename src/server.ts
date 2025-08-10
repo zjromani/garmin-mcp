@@ -8,6 +8,7 @@
 import express from "express";
 import bodyParser from "body-parser";
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import type { Request, Response, NextFunction } from "express";
 
 const {
@@ -24,6 +25,15 @@ const healthDataCache = new Map<string, any>();
 // Express
 const app = express();
 app.use(bodyParser.json({ limit: "2mb" }));
+
+// Rate limiting for webhook endpoint
+const webhookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many webhook requests from this IP"
+});
+
+app.use('/garmin/webhook', webhookLimiter);
 
 // Healthcheck for load balancers
 app.get("/healthz", (_req: Request, res: Response) => res.status(200).send("ok"));
